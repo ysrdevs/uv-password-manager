@@ -15,6 +15,7 @@ import io
 import zipfile
 import tempfile
 import pyminizip
+import getpass
 
 
 ACCOUNTS_FILE = "accounts.encrypted"
@@ -72,7 +73,7 @@ def get_totp_code(secret):
 def get_master_password():
     """Prompt the user for the master password."""
     while True:
-        password = input("Enter your master password: ")
+        password = getpass.getpass("Enter your master password: ")
         if len(password) >= 12:
             return password
         print("Password must be at least 12 characters long.")
