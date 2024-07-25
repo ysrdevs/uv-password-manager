@@ -13,17 +13,17 @@ Thank you for considering contributing to UV's Password Manager! We welcome cont
 
 ## Code of Conduct
 
-This project and everyone participating in it are governed by the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [contact@example.com](mailto:contact@example.com).
+This project and everyone participating in it are governed by the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [ysrdevs@gmail.com](mailto:ysrdevs@gmail.com).
 
 ## How to Contribute
 
 ### Reporting Bugs
 
-If you find a bug, please report it by opening a [new issue](https://github.com/yourusername/yourrepository/issues). Include as much detail as possible to help us understand and fix the issue quickly.
+If you find a bug, please report it by opening a [new issue](https://github.com/ysrdevs/uv-password-manager/issues). Include as much detail as possible to help us understand and fix the issue quickly.
 
 ### Suggesting Features
 
-We are always open to new ideas! If you have a feature request, please open a [new issue](https://github.com/yourusername/yourrepository/issues) and describe the feature in detail. Be sure to explain why you think this feature would be useful.
+We are always open to new ideas! If you have a feature request, please open a [new issue](https://github.com/ysrdevs/uv-password-manager/issues) and describe the feature in detail. Be sure to explain why you think this feature would be useful.
 
 ### Submitting Pull Requests
 
