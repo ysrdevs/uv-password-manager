@@ -37,7 +37,7 @@ Note: `tkinter` is usually included with Python installations. If it's missing, 
 
 1. Run the script:
    ```
-   python password_manager.py
+   python uv.py
    ```
 
 2. On first run, you'll be prompted to set up a master password.
