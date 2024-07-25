@@ -13,6 +13,15 @@ This is a secure password manager that generates, stores, and manages passwords 
 - Two-factor authentication (2FA) support with TOTP
 - Secure storage of account information in an encrypted file
 
+## Upcoming Features
+
+We're constantly working to improve UV's Password Manager. Here are some features we're planning to implement in future updates:
+
+- Password Breach Monitoring: Automatic checks against known data breaches to alert you if any of your passwords have been compromised.
+- Customizable Password Policies: Set your own rules for password complexity and length for different types of accounts.
+- Session Timeout: Automatically log out after a period of inactivity for added security.
+- In-App Help and Documentation: Easily accessible guides and explanations for all features within the application.
+
 ## Requirements
 
 - Python 3.6 or higher
