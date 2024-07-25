@@ -39,7 +39,7 @@ We are always open to new ideas! If you have a feature request, please open a [n
 4. **Make your changes**: Implement your feature or bug fix.
 5. **Commit your changes**: Follow our commit message guidelines.
     ```sh
-    git commit -am 'Add new feature'
+    git commit -m 'Add new feature'
     ```
 6. **Push to the branch**:
     ```sh
