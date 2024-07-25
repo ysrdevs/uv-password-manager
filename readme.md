@@ -28,7 +28,7 @@ This is a secure password manager that generates, stores, and manages passwords 
 You can install the required packages using pip:
 
 ```
-pip install pyperclip cryptography pyotp qrcode simple-term-menu pyminizip colorama
+pip install pyperclip cryptography pyotp qrcode simple-term-menu pyminizip
 ```
 
 Note: `tkinter` is usually included with Python installations. If it's missing, you may need to install it separately depending on your operating system.
