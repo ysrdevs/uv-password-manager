@@ -17,8 +17,8 @@ This is a secure password manager that generates, stores, and manages passwords 
 
 - (ADDED) Password Breach Monitoring: Manual checks against known data breaches to alert you if any of your passwords have been compromised.
 - (ADDED) Customizable Password Policies: Set your own rules for password complexity and length for different types of accounts.
-- Session Timeout: Automatically log out after a period of inactivity for added security.
-- In-App Help and Documentation: Easily accessible guides and explanations for all features within the application.
+- (ADDED) Session Timeout: Automatically log out after a period of inactivity for added security.
+- (ADDED) In-App Help and Documentation: Easily accessible guides and explanations for all features within the application.
 
 ## Requirements
 
