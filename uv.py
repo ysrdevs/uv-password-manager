@@ -18,11 +18,71 @@ import pyminizip
 import getpass
 import requests
 import hashlib
+import time
+import threading
+import sys
 
 ACCOUNTS_FILE = "accounts.encrypted"
 SALT_FILE = "salt.txt"
 POLICIES_FILE = "password_policies.json"
-VERSION = "2.2"
+SETTINGS_FILE = "settings.json"
+VERSION = "2.3"
+
+# Global variable for session timeout
+SESSION_TIMEOUT = 300  # Default 5 minutes
+
+class SessionTimeoutException(Exception):
+    pass
+
+class ThreadSafeFloat:
+    def __init__(self, value):
+        self.value = value
+        self._lock = threading.Lock()
+
+    def set(self, value):
+        with self._lock:
+            self.value = value
+
+    def get(self):
+        with self._lock:
+            return self.value
+
+def load_settings():
+    """Load settings from file."""
+    global SESSION_TIMEOUT
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, 'r') as f:
+            settings = json.load(f)
+            SESSION_TIMEOUT = settings.get('session_timeout', 300)
+    else:
+        save_settings()
+
+def save_settings():
+    """Save settings to file."""
+    with open(SETTINGS_FILE, 'w') as f:
+        json.dump({'session_timeout': SESSION_TIMEOUT}, f)
+
+def change_session_timeout():
+    """Allow user to change the session timeout."""
+    global SESSION_TIMEOUT
+    clear_screen()
+    print(f"Current session timeout: {SESSION_TIMEOUT} seconds")
+    try:
+        new_timeout = int(input("Enter new timeout in seconds (or 0 to disable): "))
+        if new_timeout < 0:
+            raise ValueError
+        SESSION_TIMEOUT = new_timeout
+        save_settings()
+        print(f"Session timeout updated to {SESSION_TIMEOUT} seconds.")
+    except ValueError:
+        print("Invalid input. Please enter a non-negative integer.")
+    input("\nPress Enter to continue...")
+
+def check_session_timeout(last_activity_time):
+    """Check if the session has timed out."""
+    if SESSION_TIMEOUT == 0:
+        return False
+    return time.time() - last_activity_time > SESSION_TIMEOUT
 
 def clear_screen():
     """Clear the console screen."""
@@ -122,7 +182,17 @@ def login():
                 print("Too many failed attempts. Exiting for security reasons.")
                 exit()
 
-def show_password_and_totp(account_data):
+def secure_operation(func):
+    def wrapper(*args, **kwargs):
+        if check_session_timeout(args[0].get()):
+            raise SessionTimeoutException("Session timed out. Please log in again.")
+        result = func(*args, **kwargs)
+        args[0].set(time.time())  # Update last activity time
+        return result
+    return wrapper
+
+@secure_operation
+def show_password_and_totp(last_activity_time, account_data):
     """Display the password and TOTP with options to view or copy."""
     menu_items = ["View password (WARNING: DISPLAYS PASSWORD)", "Copy password to clipboard"]
     if account_data.get('totp_secret'):
@@ -172,7 +242,8 @@ def select_account(accounts):
     choice = menu.show()
     return None if choice is None else list(accounts)[choice]
 
-def list_accounts(accounts):
+@secure_operation
+def list_accounts(last_activity_time, accounts):
     """List all accounts with additional details."""
     clear_screen()
     if accounts:
@@ -184,7 +255,8 @@ def list_accounts(accounts):
         print("No accounts found. Please create a new account to get started.")
     input("\nPress Enter to continue...")
 
-def export_accounts(accounts, key):
+@secure_operation
+def export_accounts(last_activity_time, accounts, key):
     """Export accounts to a file or a password-protected zip file."""
     clear_screen()
     export_formats = ["CSV (Standard)", "JSON (UV's Password Manager)", "LastPass CSV", "Proton Pass CSV"]
@@ -251,8 +323,9 @@ def export_accounts(accounts, key):
 
     print("WARNING: This file contains sensitive information. Please keep it secure.")
     input("\nPress Enter to continue...")
-        
-def import_accounts(current_accounts, key):
+
+@secure_operation
+def import_accounts(last_activity_time, current_accounts, key):
     """Import accounts from a secure, encrypted file with format options."""
     clear_screen()
     import_formats = ["CSV (Standard)", "JSON (UV's Password Manager)", "LastPass CSV", "Proton Pass CSV"]
@@ -320,7 +393,8 @@ def import_accounts(current_accounts, key):
     
     input("\nPress Enter to continue...")
 
-def delete_account(accounts, key):
+@secure_operation
+def delete_account(last_activity_time, accounts, key):
     """Delete an existing account."""
     clear_screen()
     if not accounts:
@@ -339,17 +413,8 @@ def delete_account(accounts, key):
             print("\nDeletion cancelled.")
     input("\nPress Enter to continue...")
 
-def check_password_breach(password):
-    """Check if a password has been involved in a data breach using the HIBP API."""
-    sha1_password = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
-    prefix, suffix = sha1_password[:5], sha1_password[5:]
-    url = f"https://api.pwnedpasswords.com/range/{prefix}"
-    response = requests.get(url)
-    hashes = (line.split(':') for line in response.text.splitlines())
-    count = next((int(count) for t, count in hashes if t == suffix), 0)
-    return count
-
-def check_account_breaches(accounts):
+@secure_operation
+def check_account_breaches(last_activity_time, accounts):
     """Check all accounts for password breaches."""
     clear_screen()
     print("Checking for password breaches...")
@@ -368,6 +433,16 @@ def check_account_breaches(accounts):
         print("\nGood news! None of your passwords appear in known data breaches.")
     
     input("\nPress Enter to continue...")
+
+def check_password_breach(password):
+    """Check if a password has been involved in a data breach using the HIBP API."""
+    sha1_password = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
+    prefix, suffix = sha1_password[:5], sha1_password[5:]
+    url = f"https://api.pwnedpasswords.com/range/{prefix}"
+    response = requests.get(url)
+    hashes = (line.split(':') for line in response.text.splitlines())
+    count = next((int(count) for t, count in hashes if t == suffix), 0)
+    return count
 
 def load_password_policies():
     """Load password policies from file."""
@@ -410,7 +485,8 @@ def generate_password_with_policy(policy):
         if check_password_strength(password, policy):
             return password
 
-def manage_password_policies(policies):
+@secure_operation
+def manage_password_policies(last_activity_time, policies):
     """Manage password policies."""
     while True:
         clear_screen()
@@ -449,15 +525,6 @@ def manage_password_policies(policies):
             name = input("Enter the name of the policy to delete: ")
             if name in policies and name != 'default':
                 del policies[name]
-                if len(policies) == 0:
-                    # If all policies were deleted, recreate the default policy
-                    policies['default'] = {
-                        "min_length": 12,
-                        "require_uppercase": True,
-                        "require_lowercase": True,
-                        "require_digits": True,
-                        "require_special_chars": True
-                    }
                 save_password_policies(policies)
                 print("Policy deleted successfully.")
             else:
@@ -466,17 +533,8 @@ def manage_password_policies(policies):
         elif choice == '4':
             break
 
-    # Ensure there's always at least one policy
-    if len(policies) == 0:
-        policies['default'] = {
-            "min_length": 12,
-            "require_uppercase": True,
-            "require_lowercase": True,
-            "require_digits": True,
-            "require_special_chars": True
-        }
-        save_password_policies(policies)
-def add_or_update_account(accounts, key, existing_account=None):
+@secure_operation
+def add_or_update_account(last_activity_time, accounts, key, existing_account=None):
     """Add a new account or update an existing one with policy check."""
     clear_screen()
     policies = load_password_policies()
@@ -493,21 +551,10 @@ def add_or_update_account(accounts, key, existing_account=None):
     
     # Select password policy
     policy_names = list(policies.keys())
-    if not policy_names:
-        print("No password policies found. Using default policy.")
-        selected_policy = {
-            "min_length": 12,
-            "require_uppercase": True,
-            "require_lowercase": True,
-            "require_digits": True,
-            "require_special_chars": True
-        }
-        policy_name = "default"
-    else:
-        policy_menu = TerminalMenu(policy_names, title="Select password policy:")
-        policy_choice = policy_menu.show()
-        policy_name = policy_names[policy_choice]
-        selected_policy = policies[policy_name]
+    policy_menu = TerminalMenu(policy_names, title="Select password policy:")
+    policy_choice = policy_menu.show()
+    policy_name = policy_names[policy_choice]
+    selected_policy = policies[policy_name]
 
     if existing_account:
         password_choice = input("Do you want to change the password? (y/n): ").lower()
@@ -572,69 +619,165 @@ def add_or_update_account(accounts, key, existing_account=None):
     save_to_file(accounts, key)
     print(f"\nAccount '{account_name}' has been {'updated' if existing_account else 'added'}.")
     input("\nPress Enter to continue...")
+
+def timeout_thread(stop_event, last_activity_time):
+    while not stop_event.is_set():
+        if check_session_timeout(last_activity_time.get()):
+            stop_event.set()
+        time.sleep(1)  # Check every second
+
+def session_timeout_menu():
+    """Display a simple menu after session timeout."""
+    clear_screen()
+    print("Session timed out. Please log in again.")
+    
+    menu_items = [
+        "Log in again",
+        "Quit"
+    ]
+    
+    menu = TerminalMenu(menu_items, title="Session Timeout Menu")
+    
+    while True:
+        choice = menu.show()
+        
+        if choice == 0:  # Log in again
+            return "login"
+        elif choice == 1 or choice is None:  # Quit
+            return "quit"
+
+def show_help_menu():
+    """Display the help menu with various topics."""
+    while True:
+        clear_screen()  # Clear the screen before showing the help menu
+        help_topics = [
+            "How to add a new account",
+            "How to retrieve an existing account",
+            "How to update an existing account",
+            "How to delete an account",
+            "How to export accounts",
+            "How to import accounts",
+            "How to check for password breaches",
+            "How to manage password policies",
+            "How to change session timeout",
+            "Return to main menu"
+        ]
+        
+        help_details = {
+            0: "To add a new account, select 'Add a new account' from the main menu. Follow the prompts to enter account details and generate a secure password.",
+            1: "To retrieve an existing account, select 'Retrieve an existing account' from the main menu. You'll be able to view and copy your passwords and TOTP codes.",
+            2: "To update an existing account, select 'Update an existing account' from the main menu. Choose the account to update and follow the prompts.",
+            3: "To delete an account, select 'Delete an account' from the main menu. Confirm the deletion when prompted.",
+            4: "To export accounts, select 'Export accounts' from the main menu. You can choose between CSV and JSON formats, and optionally protect the file with a password.",
+            5: "To import accounts, select 'Import accounts' from the main menu. Choose the format and provide the decryption key if necessary.",
+            6: "To check for password breaches, select 'Check for password breaches' from the main menu. The app will verify your passwords against known breaches.",
+            7: "To manage password policies, select 'Manage password policies' from the main menu. You can view, add, or edit policies to ensure your passwords are secure.",
+            8: "To change the session timeout, select 'Change session timeout' from the main menu. You can adjust the timeout duration or disable it altogether."
+        }
+        
+        menu = TerminalMenu(help_topics, title="Help & Documentation")
+        
+        choice = menu.show()
+        if choice is None or choice == len(help_topics) - 1:  # Return to main menu
+            break
+        else:
+            clear_screen()  # Clear the screen before showing the help details
+            print(help_details[choice])
+            input("\nPress Enter to return to the help menu...")
+
 def main_menu(key):
     """Display the main menu and handle user input."""
-    while True:
-        clear_screen()
-        accounts = load_accounts(key)
-        policies = load_password_policies()
-        print(f"UV's Password Manager (v{VERSION})")
-        if not accounts:
-            print("There are currently no accounts stored.")
-            print("Select 'Add a new account' to get started.\n")
+    last_activity_time = ThreadSafeFloat(time.time())
+    stop_event = threading.Event()
+    timeout_thread_obj = threading.Thread(target=timeout_thread, args=(stop_event, last_activity_time))
+    timeout_thread_obj.daemon = True
+    timeout_thread_obj.start()
 
-        menu_items = [
-            "Add a new account",
-            "Retrieve an existing account",
-            "Update an existing account",
-            "List all accounts",
-            "Delete an account",
-            "Export accounts",
-            "Import accounts",
-            "Check for password breaches",
-            "Manage password policies",
-            "Quit"
-        ]
-        menu = TerminalMenu(menu_items, title="Main Menu")
-        choice = menu.show()
+    user_quit = False  # Define user_quit at the beginning of the main_menu function
 
-        if choice == 0:  # Add a new account
-            add_or_update_account(accounts, key)
-        elif choice == 1:  # Retrieve an existing account
-            clear_screen()
-            if not accounts:
-                print("No accounts found. Please create a new account first.")
-                input("\nPress Enter to continue...")
-                continue
-            account = select_account(accounts)
-            if account:
-                show_password_and_totp(accounts[account])
-        elif choice == 2:  # Update an existing account
-            clear_screen()
-            if not accounts:
-                print("No accounts found. Please create a new account first.")
-                input("\nPress Enter to continue...")
-                continue
-            account = select_account(accounts)
-            if account:
-                add_or_update_account(accounts, key, existing_account=account)
-        elif choice == 3:  # List all accounts
-            list_accounts(accounts)
-        elif choice == 4:  # Delete an account
-            delete_account(accounts, key)
-        elif choice == 5:  # Export accounts
-            export_accounts(accounts, key)
-        elif choice == 6:  # Import accounts
-            import_accounts(accounts, key)
-        elif choice == 7:  # Check for password breaches
-            check_account_breaches(accounts)
-        elif choice == 8:  # Manage password policies
-            manage_password_policies(policies)
-        elif choice == 9 or choice is None:  # Quit
-            clear_screen()
-            print("Thank you for using UV's Password Manager. Stay secure!")
-            break
+    try:
+        while not stop_event.is_set():
+            try:
+                clear_screen()
+                accounts = load_accounts(key)
+                policies = load_password_policies()
+                print(f"UV's Password Manager (v{VERSION})")
+                if not accounts:
+                    print("There are currently no accounts stored.")
+                    print("Select 'Add a new account' to get started.\n")
+
+                menu_items = [
+                    "Add a new account",
+                    "Retrieve an existing account",
+                    "Update an existing account",
+                    "List all accounts",
+                    "Delete an account",
+                    "Export accounts",
+                    "Import accounts",
+                    "Check for password breaches",
+                    "Manage password policies",
+                    "Change session timeout",
+                    "Help & Documentation",  # New Help menu option
+                    "Quit"
+                ]
+                menu = TerminalMenu(menu_items, title="Main Menu")
+                
+                choice = menu.show()
+                if choice is None:
+                    break  # Exit if user cancels
+
+                if choice == 0:  # Add a new account
+                    add_or_update_account(last_activity_time, accounts, key)
+                elif choice == 1:  # Retrieve an existing account
+                    account = select_account(accounts)
+                    if account:
+                        show_password_and_totp(last_activity_time, accounts[account])
+                elif choice == 2:  # Update an existing account
+                    account = select_account(accounts)
+                    if account:
+                        add_or_update_account(last_activity_time, accounts, key, existing_account=account)
+                elif choice == 3:  # List all accounts
+                    list_accounts(last_activity_time, accounts)
+                elif choice == 4:  # Delete an account
+                    delete_account(last_activity_time, accounts, key)
+                elif choice == 5:  # Export accounts
+                    export_accounts(last_activity_time, accounts, key)
+                elif choice == 6:  # Import accounts
+                    import_accounts(last_activity_time, accounts, key)
+                elif choice == 7:  # Check for password breaches
+                    check_account_breaches(last_activity_time, accounts)
+                elif choice == 8:  # Manage password policies
+                    manage_password_policies(last_activity_time, policies)
+                elif choice == 9:  # Change session timeout
+                    change_session_timeout()
+                elif choice == 10:  # Help & Documentation
+                    show_help_menu()  # Call the new help menu
+                elif choice == 11:  # Quit
+                    user_quit = True  # Set the flag indicating the user chose to quit
+                    break
+
+            except SessionTimeoutException:
+                break
+
+        # Skip the session timeout message if the user chose to quit
+        if not user_quit:
+            result = session_timeout_menu()
+            if result == "login":
+                return False  # Return False to indicate session timed out and log in again
+            elif result == "quit":
+                sys.exit()  # Exit the application
+
+    finally:
+        stop_event.set()
+        timeout_thread_obj.join(timeout=1)
+    
+    return user_quit  # Return True if the user chose to quit
 
 if __name__ == "__main__":
-    key = login()
-    main_menu(key)
+    load_settings()
+    while True:
+        key = login()  # This now handles logging in without asking if they want to log in again
+        user_quit = main_menu(key)  # Capture the return value from main_menu
+        if user_quit:  # Break the loop if the user chose to quit
+            break
+    print("Goodbye!")
