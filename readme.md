@@ -12,13 +12,14 @@ This is a secure password manager that generates, stores, and manages passwords 
 - Optional password-protected zip export for added security
 - Two-factor authentication (2FA) support with TOTP
 - Secure storage of account information in an encrypted file
+- (NEW) Password Breach Monitoring: Manual checks against known data breaches to alert you if any of your passwords have been compromised.
+- (NEW) Customizable Password Policies: Set your own rules for password complexity and length for different types of accounts.
+- (NEW) Session Timeout: Automatically log out after a period of inactivity for added security.
+- (NEW) In-App Help and Documentation: Easily accessible guides and explanations for all features within the application.
+
 
 ## Upcoming Features
 
-- (ADDED) Password Breach Monitoring: Manual checks against known data breaches to alert you if any of your passwords have been compromised.
-- (ADDED) Customizable Password Policies: Set your own rules for password complexity and length for different types of accounts.
-- (ADDED) Session Timeout: Automatically log out after a period of inactivity for added security.
-- (ADDED) In-App Help and Documentation: Easily accessible guides and explanations for all features within the application.
 
 ## Requirements
 
